@@ -39,3 +39,9 @@ def ca_plot(file_ca):
     fig.update_traces(line_color='royalblue', line_width=2)
     fig.show()
     return df_ca
+
+endereco_camonitor = "/home/lucas.pauleti/Documents/temp_lucas/10_04_2026" 
+#Nome dos arquivos com \nome.txt
+file_ca = "/temp_20260410_1.txt"
+file_ca = f"{endereco_camonitor}{file_ca}"
+df = ca_plot(file_ca)
