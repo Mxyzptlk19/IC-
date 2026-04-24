@@ -1,0 +1,41 @@
+import pandas as pd
+import plotly.express as px
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
+import io
+def ca_plot(file_ca):
+
+    # 1. Lendo o arquivo e filtrando apenas as linhas que têm dados
+    with open(file_ca, 'r', encoding='utf-8', errors='ignore') as f:
+        # Mantemos apenas linhas que NÃO contenham '***' ou 'Not connected'
+        # E que tenham conteúdo (não sejam vazias)
+        linhas_validas = [line for line in f if "***" not in line and "Not connected" not in line and "SCAN INVALID" not in line and "COMM INVALID" not in line and line.strip()]
+
+    # 2. Convertendo a lista de linhas de volta para um "arquivo" que o Pandas entenda
+    dado_limpo = io.StringIO("".join(linhas_validas))
+
+    # 3. Carregando no DataFrame
+    df_ca = pd.read_csv(
+        dado_limpo, 
+        sep=r'\s+', 
+        names=['PV', 'Data', 'Hora', 'Valor'], 
+        header=None
+    )
+    # Criamos uma nova coluna combinando Data e Hora
+    df_ca['Timestamp'] = pd.to_datetime(df_ca['Data'] + ' ' + df_ca['Hora'])
+
+# Garantimos que a coluna Valor seja numérica (caso tenha vindo como texto)
+    df_ca['Valor'] = pd.to_numeric(df_ca['Valor'], errors='coerce')
+    fig = px.line(
+    df_ca, 
+    x='Timestamp', 
+    y='Valor', 
+    title=f'{df_ca.loc[0,"PV"]}',
+    labels={'Timestamp': 'Tempo', 'Valor': 'Valor da PV (eu)'},
+    template='plotly_white' # Deixa o fundo limpo e profissional
+)
+
+# Ajustes extras para melhorar a visualização
+    fig.update_traces(line_color='royalblue', line_width=2)
+    fig.show()
+    return df_ca
