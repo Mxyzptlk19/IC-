@@ -1,3 +1,6 @@
+#Code to use on jupyter notebook
+#See the time it will take to heat the furnace
+
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
@@ -123,6 +126,7 @@ def calcular_ciclo_termico(temp_final_aquecimento, tempos_plato_inter, tempo_pla
     fig.show()
     
     return df_forno
+
 # ==========================================
 # VALORES DE ENTRADA
 # ==========================================
