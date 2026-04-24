@@ -1,0 +1,151 @@
+import pandas as pd
+import plotly.express as px
+from datetime import datetime, timedelta
+import plotly.graph_objects as go
+import io
+def calcular_ciclo_termico(temp_final_aquecimento, tempos_plato_inter, tempo_plato_final, 
+                           taxa_aquecimento=5.0, taxa_resfriamento=10.0, 
+                           temp_inicial=20.0, temp_final_resfriamento=20.0, 
+                           hora_inicio="08:00"):
+    """
+    Calcula o ciclo térmico completo com controle total sobre as taxas e temperaturas finais.
+    """
+    hoje = datetime.now().date()
+    hora_obj = datetime.strptime(hora_inicio, "%H:%M").time()
+    horario_atual = datetime.combine(hoje, hora_obj)
+    
+    # Define as paradas intermediárias
+    alvos_inter = []
+    temp = 100.0
+    while temp < temp_final_aquecimento:
+        if temp > temp_inicial: 
+            alvos_inter.append(temp)
+        temp += 100.0
+        
+    if len(tempos_plato_inter) != len(alvos_inter):
+        print(f"ERRO: Teremos {len(alvos_inter)} paradas intermediárias: {alvos_inter}.")
+        print(f"Você forneceu {len(tempos_plato_inter)} tempos. Por favor, ajuste a lista.")
+        return None
+        
+    tempo_total = 0.0
+    temp_atual = temp_inicial
+    
+    tempos_corridos = [0.0]
+    horarios_reais = [horario_atual]
+    temperaturas = [temp_inicial]
+    
+    print(f"--- INÍCIO: {horario_atual.strftime('%H:%M')} (Temp. Inicial: {temp_inicial}°C) ---")
+    
+    # 1. Rampas e Platôs Intermediários
+    for i, alvo in enumerate(alvos_inter):
+        plato = tempos_plato_inter[i]
+        tempo_rampa = abs(alvo - temp_atual) / taxa_aquecimento
+        
+        tempo_total += tempo_rampa
+        temp_atual = alvo
+        horario_atual += timedelta(minutes=tempo_rampa)
+        
+        tempos_corridos.append(tempo_total)
+        horarios_reais.append(horario_atual)
+        temperaturas.append(temp_atual)
+        print(f"[{horario_atual.strftime('%H:%M')}] Atingiu {temp_atual}°C.")
+        
+        if plato > 0:
+            tempo_total += plato
+            horario_atual += timedelta(minutes=plato)
+            tempos_corridos.append(tempo_total)
+            horarios_reais.append(horario_atual)
+            temperaturas.append(temp_atual)
+            print(f"[{horario_atual.strftime('%H:%M')}] Fim do platô de {plato} min em {temp_atual}°C.")
+
+    # 2. Rampa Final de Aquecimento
+    if temp_atual < temp_final_aquecimento:
+        tempo_rampa = abs(temp_final_aquecimento - temp_atual) / taxa_aquecimento
+        tempo_total += tempo_rampa
+        temp_atual = temp_final_aquecimento
+        horario_atual += timedelta(minutes=tempo_rampa)
+        
+        tempos_corridos.append(tempo_total)
+        horarios_reais.append(horario_atual)
+        temperaturas.append(temp_atual)
+        print(f"[{horario_atual.strftime('%H:%M')}] Atingiu a MÁXIMA de {temp_atual}°C.")
+
+    # 3. PLATÔ FINAL
+    if tempo_plato_final > 0:
+        tempo_total += tempo_plato_final
+        horario_atual += timedelta(minutes=tempo_plato_final)
+        tempos_corridos.append(tempo_total)
+        horarios_reais.append(horario_atual)
+        temperaturas.append(temp_atual)
+        print(f"[{horario_atual.strftime('%H:%M')}] Fim do PLATÔ FINAL ({tempo_plato_final} min). Iniciando resfriamento")
+
+    # 4. Rampa de Resfriamento
+    if temp_atual != temp_final_resfriamento: 
+        tempo_resfriamento = abs(temp_atual - temp_final_resfriamento) / taxa_resfriamento
+        tempo_total += tempo_resfriamento
+        temp_atual = temp_final_resfriamento
+        horario_atual += timedelta(minutes=tempo_resfriamento)
+        
+        tempos_corridos.append(tempo_total)
+        horarios_reais.append(horario_atual)
+        temperaturas.append(temp_atual)
+        print(f"[{horario_atual.strftime('%H:%M')}] Resfriamento concluído. Forno em {temp_atual}°C.")
+    
+    # Resumo
+    horas = int(tempo_total // 60)
+    minutos = int(tempo_total % 60)
+    print("\n" + "="*50)
+    print(f" PREVISÃO DE TÉRMINO: {horario_atual.strftime('%H:%M')}")
+    print(f" Duração total: {horas}h e {minutos}m")
+    print("="*50 + "\n")
+    
+    df_forno = pd.DataFrame({
+        'Tempo Corrido (min)': tempos_corridos, 
+        'Horário': horarios_reais,
+        'Temperatura (°C)': temperaturas
+    })
+    
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=df_forno['Horário'], y=df_forno['Temperatura (°C)'], 
+        mode='lines+markers', name='Temp. do Forno', 
+        line=dict(color='firebrick', width=2),
+        hovertemplate='Horário: %{x|%H:%M}<br>Temperatura: %{y}°C<extra></extra>' 
+    ))
+    
+    fig.update_layout(
+        title=f'Perfil de Temperatura (Alvo: {temp_final_aquecimento}°C | Início: {hora_inicio})',
+        xaxis_title='Horário',
+        yaxis_title='Temperatura (°C)',
+        template='plotly_white',
+        xaxis=dict(tickformat='%H:%M') # Força o eixo X a mostrar apenas Hora e Minuto
+    )
+    fig.show()
+    
+    return df_forno
+# ==========================================
+# VALORES DE ENTRADA
+# ==========================================
+
+temp_alvo = 200
+platos_intermediarios = [5]
+plato_final_maximo = 0
+
+taxa_de_aquecimento = 5.0
+taxa__de_resfriamento = 10.0     
+temp_de_inicio = 20.0          
+temp_final_de_resfriamento = 20.0
+hora_que_ligou_o_forno = "08:40" 
+
+
+df_resultado = calcular_ciclo_termico(
+    temp_final_aquecimento=temp_alvo,                     # Temperatura máxima (°C)
+    tempos_plato_inter=platos_intermediarios,             # Plato a cada 100°C (min)
+    tempo_plato_final=plato_final_maximo,                 # Plato da temperatura máxima (min)
+    
+    taxa_aquecimento=taxa_de_aquecimento,                 # Taxa de subida (°C/min)
+    taxa_resfriamento=taxa__de_resfriamento,              # Taxa de descida (°C/min)
+    temp_inicial=temp_de_inicio,                          # Temperatura inicial do forno (°C)
+    temp_final_resfriamento=temp_final_de_resfriamento,   # Temperatura pós resfriamento (°C)
+    hora_inicio=hora_que_ligou_o_forno                    # Início do experimento (horário)
+)
