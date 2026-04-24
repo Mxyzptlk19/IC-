@@ -43,8 +43,8 @@ def ca_plot(file_ca):
     fig.show()
     return df_ca
 
-endereco_camonitor = "/home/lucas.pauleti/Documents/temp_lucas/10_04_2026" 
+endereco_camonitor = "/home/lucas.pauleti/Documents/temp_lucas/10_04_2026" #the location your file is on
 #Nome dos arquivos com \nome.txt
-file_ca = "/temp_20260410_1.txt"
+file_ca = "/temp_20260410_1.txt" #the name of the file
 file_ca = f"{endereco_camonitor}{file_ca}"
 df = ca_plot(file_ca)
