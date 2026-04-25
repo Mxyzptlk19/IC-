@@ -1,6 +1,3 @@
-#Code to use on jupyter notebook
-#Plot the data you stored using camonitor
-
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
