@@ -1,6 +1,3 @@
-#Code to use on jupyter notebook
-#See the time it will take to heat the furnace
-
 import pandas as pd
 import plotly.express as px
 from datetime import datetime, timedelta
