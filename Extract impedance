@@ -1,0 +1,50 @@
+import os
+import glob
+
+def processar_arquivos():
+    # Procura todos os arquivos .txt no diretório atual
+    arquivos_txt = glob.glob('*.txt')
+    
+    if not arquivos_txt:
+        print("Nenhum arquivo .txt encontrado nesta pasta.")
+        return
+
+    for caminho_arquivo in arquivos_txt:
+        # Cria o nome do arquivo de saída (ex: TEST_01072026_processed.csv)
+        nome_base = os.path.splitext(caminho_arquivo)[0]
+        caminho_saida = f"{nome_base}_processed.csv"
+        
+        try:
+            with open(caminho_arquivo, 'r') as arquivo_entrada, open(caminho_saida, 'w') as arquivo_saida:
+                linhas = arquivo_entrada.readlines()
+                
+                for linha in linhas:
+                    # Pula linhas em branco
+                    if not linha.strip():
+                        continue
+                        
+                    # Separa os elementos da linha transformando em uma lista
+                    colunas = linha.split()
+                    
+                    # Verifica se é a linha de cabeçalho
+                    if 'freq/Hz' in linha:
+                        # Se quiser manter o cabeçalho no novo arquivo, tire o '#' da linha abaixo:
+                        # arquivo_saida.write(f"{colunas[1]},{colunas[2]}\n")
+                        continue
+                        
+                    # Garante que a linha tem pelo menos 3 colunas para evitar erros de índice
+                    if len(colunas) >= 3:
+                        re_z = colunas[1]
+                        im_z = colunas[2]
+                        
+                        # Usa f-string para formatar a saída com a vírgula
+                        arquivo_saida.write(f"{re_z},{im_z}\n")
+                        
+            print(f"Processado: {caminho_arquivo} -> {caminho_saida}")
+            
+        except Exception as e:
+            print(f"Erro ao processar {caminho_arquivo}: {e}")
+
+if __name__ == "__main__":
+    processar_arquivos()
+    print("Concluído!")
