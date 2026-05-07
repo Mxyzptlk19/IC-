@@ -1,23 +1,43 @@
 import pandas as pd
 import matplotlib.pyplot as plt
+import os
+
+
+DATA_DIR = "data/"
 
 # Input
-RAW_FILE_NAME = 'rocking_11564_Cr_0255(in).csv'
+RAW_FILE_PATH = DATA_DIR + "raw/"
+RAW_FILE_NAME = 'rocking_11564_Cr_0255.csv'
 
 RAW_COLUMNS = ["signal", "date", "hour", "measure"]
 RAW_HEADER = None
 RAW_SEP = r"\s+" 
 
 X_VAR = "DCM"
-Y_VAR = 'QUA:A:PICO03:Current4'
+Y_VARS = (
+    'QUA:A:PICO03:Current1',
+    'QUA:A:PICO03:Current2',
+    'QUA:A:PICO03:Current3',
+    'QUA:A:PICO03:Current4',
+    'QUA:B:RIO01:9223A:ai1'
+)
 
 TIME_UNIT_ROUNDING = (3, 2, 1, 0)
 
-PROC_FILE_PATH = "processed/"
+# Output
+PROC_ROOT_FILE_PATH = DATA_DIR + "processed/"
+PROC_FILE_PATH = PROC_ROOT_FILE_PATH + RAW_FILE_NAME.rsplit(".", 1)[0]+"/"
+PROC_CSV_PATH = PROC_FILE_PATH + "csv/"
+PROC_IMG_PATH = PROC_FILE_PATH + "img/"
 PROC_DECIMAL = "."
 
 if __name__ == "__main__":
-    df = pd.read_csv(RAW_FILE_NAME, sep=RAW_SEP, header=RAW_HEADER, names=RAW_COLUMNS)
+
+    for proc_path in (PROC_ROOT_FILE_PATH, PROC_FILE_PATH, PROC_CSV_PATH, PROC_IMG_PATH):
+        if not os.path.isdir(proc_path):
+            os.mkdir(proc_path)
+
+    df = pd.read_csv(RAW_FILE_PATH+RAW_FILE_NAME, sep=RAW_SEP, header=RAW_HEADER, names=RAW_COLUMNS)
 
     # Verificar se foi tudo no mesmo dia
     if len(df.date.unique()) == 0:
@@ -51,68 +71,68 @@ if __name__ == "__main__":
 
 
     # Vamos começar com um par arbitrario, sendo 'QUA:A:PICO03:Current3' a variável y
-    y_source = Y_VAR
+    for y_source in Y_VARS:
 
-    # Separar dataframes do par escolhido
-    x_df = df[df.signal == x_source].drop("signal", axis=1)
-    y_df = df[df.signal == y_source].drop("signal", axis=1)
+        x_df = df[df.signal == x_source].drop("signal", axis=1)
+        time_x = x_df.time
 
-    # Testar diferentes arredondamentos do tempo
-    time_x, time_y = x_df.time, y_df.time
-    aux, final_d = 1000, 1000
-    for i, n_decimals in enumerate(TIME_UNIT_ROUNDING):
-        if i == 0:
-            aux = abs(len(time_x.round(n_decimals).unique()) - len(time_y.round(n_decimals).unique()))
-        else:
-            if aux <= abs(len(time_x.round(n_decimals).unique()) - len(time_y.round(n_decimals).unique())):
-                final_d = n_decimals
+        # Separar dataframes do par escolhido
+        y_df = df[df.signal == y_source].drop("signal", axis=1)
 
-    # Arrendondar de fato
-    x_df.time = x_df.time.round(final_d)
-    y_df.time = y_df.time.round(final_d)
-    # Se tiver zero casas decimais de precisão, podemos transformar em inteiro!
-    if n_decimals == 0:
-        x_df.time = x_df.time.astype(int)
-        y_df.time = y_df.time.astype(int)
+        # Testar diferentes arredondamentos do tempo
+        time_y = y_df.time
+        aux, final_d = 1000, 1000
+        for i, n_decimals in enumerate(TIME_UNIT_ROUNDING):
+            if i == 0:
+                aux = abs(len(time_x.round(n_decimals).unique()) - len(time_y.round(n_decimals).unique()))
+            else:
+                if aux <= abs(len(time_x.round(n_decimals).unique()) - len(time_y.round(n_decimals).unique())):
+                    final_d = n_decimals
 
-    # Remover duplicatas (mesmo sinal, mesmo instante e mesma medida)
-    x_df.drop_duplicates(keep="first", inplace=True, ignore_index=True)
-    y_df.drop_duplicates(keep="first", inplace=True, ignore_index=True)
+        # Arrendondar de fato
+        x_df.time = x_df.time.round(final_d)
+        y_df.time = y_df.time.round(final_d)
+        # Se tiver zero casas decimais de precisão, podemos transformar em inteiro!
+        if n_decimals == 0:
+            x_df.time = x_df.time.astype(int)
+            y_df.time = y_df.time.astype(int)
 
-    # Substitur medidas de instantes repetidos pela média delas
-    x_df = x_df.groupby("time").mean()
-    y_df = y_df.groupby("time").mean()
+        # Remover duplicatas (mesmo sinal, mesmo instante e mesma medida)
+        x_df.drop_duplicates(keep="first", inplace=True, ignore_index=True)
+        y_df.drop_duplicates(keep="first", inplace=True, ignore_index=True)
 
-
-    # Verificar tamanho das séries após transformações e ajustar tempo de início e fim
-    if len(x_df) > len(y_df):
-        if x_df.index[0] < y_df.index[0]:
-            x_df = x_df.iloc[list(x_df.index).index(y_df.index[0]):]
-        if x_df.index[-1] > y_df.index[-1]:
-            x_df = x_df.iloc[:list(x_df.index).index(y_df.index[-1])]
+        # Substitur medidas de instantes repetidos pela média delas
+        x_df = x_df.groupby("time").mean()
+        y_df = y_df.groupby("time").mean()
 
 
-    if len(y_df) > len(x_df):
-        if y_df.index[0] < x_df.index[0]:
-            y_df = y_df.iloc[list(y_df.index).index(x_df.index[0]):]
-        if y_df.index[-1] > x_df.index[-1]:
-            y_df = y_df.iloc[:list(y_df.index).index(x_df.index[-1])]
+        # Verificar tamanho das séries após transformações e ajustar tempo de início e fim
+        if len(x_df) > len(y_df):
+            if x_df.index[0] < y_df.index[0]:
+                x_df = x_df.iloc[list(x_df.index).index(y_df.index[0]):]
+            if x_df.index[-1] > y_df.index[-1]:
+                x_df = x_df.iloc[:list(x_df.index).index(y_df.index[-1])]
 
-    print(f"{y_df.index=}, {len(y_df.index)=}")
-    print("\n")
-    print(f"{x_df.index=}, {len(x_df.index)=}")
 
-    # Juntar as duas séries em um dataframe
-    df_final = pd.concat([x_df, y_df], axis=1, ignore_index=True, names=[x_source, y_source])
-    df_final.columns = [x_source, y_source]
-    if df_final.index[0] != 0:
-        df_final.set_index(df_final.index-df_final.index[0], inplace=True)
+        if len(y_df) > len(x_df):
+            if y_df.index[0] < x_df.index[0]:
+                y_df = y_df.iloc[list(y_df.index).index(x_df.index[0]):]
+            if y_df.index[-1] > x_df.index[-1]:
+                y_df = y_df.iloc[:list(y_df.index).index(x_df.index[-1])]
 
-    # Gerar gráfico da dispersão
-    plt.plot(df_final[x_source], df_final[y_source], ".")
-    plt.title(f"{x_source} X {y_source}")
-    plt.savefig(f"{PROC_FILE_PATH}/{x_source.rsplit(":",1)[-1]}_{y_source.rsplit(":",1)[-1]}_{RAW_FILE_NAME.rsplit(".",1)[0]}.png")
+        # Juntar as duas séries em um dataframe
+        df_final = pd.concat([x_df, y_df], axis=1, ignore_index=True, names=[x_source, y_source])
+        df_final.columns = [x_source, y_source]
+        if df_final.index[0] != 0:
+            df_final.set_index(df_final.index-df_final.index[0], inplace=True)
 
-    # Salvar arquivo csv dos dados sincronizados
-    df_final.to_csv(f"{PROC_FILE_PATH}/{x_source.rsplit(":",1)[-1]}_{y_source.rsplit(":",1)[-1]}_{RAW_FILE_NAME}", decimal=PROC_DECIMAL)
+        # Gerar gráfico da dispersão
+        plt.plot(df_final[x_source], df_final[y_source], ".")
+        plt.title(f"{x_source} X {y_source}")
+
+        plt.savefig(f"{PROC_IMG_PATH}{x_source.rsplit(":",1)[-1]}_{y_source.rsplit(":",1)[-1]}_{RAW_FILE_NAME.rsplit(".",1)[0]}.png")
+        plt.clf()
+
+        # Salvar arquivo csv dos dados sincronizados
+        df_final.to_csv(f"{PROC_CSV_PATH}/{x_source.rsplit(":",1)[-1]}_{y_source.rsplit(":",1)[-1]}_{RAW_FILE_NAME}", decimal=PROC_DECIMAL)
 
